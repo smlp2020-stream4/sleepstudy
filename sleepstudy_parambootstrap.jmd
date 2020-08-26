@@ -6,6 +6,7 @@ Adopted from MixedModels docs/src/bootstrap.md; original [source](https://github
 ## Setup
 
 ```julia
+import Cairo
 using DataFrames
 using DataFramesMeta  # dplyr-like operations
 using Gadfly          # plotting package
