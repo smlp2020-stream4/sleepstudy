@@ -188,13 +188,15 @@ For output of results:
 + File > Download as > HTML
 + File > Download as > Julia (.jl)
 
-You can also convert the notebook in the Julia REPL to different file formats:
+You can also convert the notebook in the Julia REPL to different file formats and take it from there:
 
 ```
 julia> using Weave
 julia> convert_doc("sleepstudy_rk.ipynb", "sleepstudy_rk.jmd")
 julia> convert_doc("sleepstudy_rk.ipynb", "sleepstudy_rk.jl")
-julia> weave("sleepstudy_rk.jmd", doctype="md2html") 
+
+julia> weave("sleepstudy_rk.jmd", fig_ext=".svg", doctype="md2html") 
+julia> weave("sleepstudy_rk.jmd", fig_ext=".svg", doctype="md2tex") # for input to TeX
 ```
 
 
