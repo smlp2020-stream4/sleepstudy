@@ -1,0 +1,148 @@
+
+# Setup 
+
+We produce the subject facets for the sleepstudy data including
+
++ observations
++ conditional means
++ within-subject slopes
++ estimate for pooled data
+
+```julia
+cd("/Users/reinholdkliegl/Google Drive/git_projects/sleepstudy")
+import Pkg
+Pkg.activate(".")
+```
+
+# Julia
+
+```julia
+using MixedModels                      # run mixed models
+using RCall, RData                     # call R functions from inside Julia
+using DataFrames, DataFramesMeta       # work with data tables
+```
+
+# R 
+
+##  Load packages
+
+We use Julia's `RCall()` for this. 
+
+```julia
+R"""
+library(lme4)
+library(svglite)
+library(tidyverse)
+
+sleepstudy <- mutate(sleepstudy, Subject = fct_reorder(Subject, Reaction, mean))
+""";
+```
+
+## Fit LMM
+
+```julia
+R"""
+fm <- lmer(Reaction ~ 1 + Days + (Days | Subject), sleepstudy)
+print(summary(fm))
+""";
+```
+
+## Extract conditional means
+
+```julia
+R"""
+cms <- coef(fm)[["Subject"]] %>% 
+  tibble::rownames_to_column("Subject") %>% 
+  rename(Day_0 = `(Intercept)`) %>% 
+  tibble::add_column(Estimate = "Conditional means")
+cms
+"""
+```
+
+## Generate facet plot
+
+```julia
+R"""
+plot1 <- 
+  sleepstudy %>%
+  mutate(Subject = forcats::fct_reorder(Subject, Reaction, mean)) %>%
+  ggplot(aes(x = Days, y = Reaction)) + 
+  geom_point() +
+  geom_abline(data=cms, aes(intercept = Day_0, slope = Days)) +
+  facet_wrap(~ fct_rev(fct_rev(Subject))) + 
+  theme_bw()
+plot1
+"""
+```
+
+## Estimate within-subject slopes
+
+
+
+```julia
+R"""
+wss <- lmList(Reaction ~ 1 + Days | Subject, sleepstudy) %>% 
+  coef() %>% 
+  tibble::rownames_to_column("Subject") %>% 
+  rename(Day_0 = `(Intercept)`) %>% 
+  tibble::add_column(Estimate = "Within-subject")
+"""
+```
+
+# Estimate for pooled data
+
+```julia
+R"""
+pld <- tibble(
+  Subject = factor(levels(sleepstudy$Subject)),
+  Day_0 = coef(lm(Reaction ~ 1 + Days, sleepstudy))[1],
+  Days = coef(lm(Reaction ~ 1 + Days, sleepstudy))[2],
+  Estimate = "Pooled"
+)
+"""
+```
+
+# Combine the estimates
+
+```julia
+R"""
+cms_wss_pld <- bind_rows(cms, wss, pld)
+cms_wss_pld
+"""
+```
+
+# Generate second facet plot
+
+```julia
+R"""
+plot2 <- 
+  sleepstudy %>%
+  ggplot(aes(x = Days, y = Reaction)) + 
+  geom_point() +
+  geom_abline(data=cms_wss_pld, aes(intercept = Day_0, slope = Days, color = Estimate)) +
+  facet_wrap(~ fct_rev(fct_rev(Subject))) +
+  theme_bw() +
+  theme(legend.position = c(.9, .1))
+
+# save the plot
+ggsave("plot2.svg", plot2, width = 8, height = 7)
+
+# show the plot
+plot2
+"""
+```
+
+# Shrinkage plot
+
+```julia
+R"""
+bind_rows(wss, cms) %>%
+  ggplot(aes(x = Day_0, y = Days, color = Estimate)) + 
+  geom_point() + 
+  geom_point(data = pld) + 
+  geom_path(aes(group = Subject), 
+            arrow = arrow(length = unit(.02, "npc"))) + 
+  theme_bw() + theme(legend.position = "top") +
+  ggtitle("Shrinkage ('Borrowing Strength')")
+"""
+```
