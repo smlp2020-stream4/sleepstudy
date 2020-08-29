@@ -1,17 +1,19 @@
 ---
+title: "Borrowing Strength with Linear Mixed Models: R-based lme4"
 output: html_document
 editor_options: 
   chunk_output_type: console
 ---
 
-# Setup 
+## Setup 
 
-We produce the subject facets for the sleepstudy data including
+We produce the subject facets for the `sleepstudy` data including
 
 + observations
 + conditional means
 + within-subject slopes
 + estimate for pooled data
+
 
 ```{r}
 library(lme4)
@@ -21,14 +23,16 @@ data(sleepstudy)
 sleepstudy <- mutate(sleepstudy, Subject = fct_reorder(Subject, Reaction, mean)) 
 ```
 
-# Fit LMM
+## Basics
+
+### Fit the model
 
 ```{r}
 fm <- lmer(Reaction ~ 1 + Days + (Days | Subject), sleepstudy)
 print(summary(fm))
 ```
 
-# Extract conditional means
+## Extract conditional means
 
 ```{r}
 cms <- coef(fm)[["Subject"]] %>% 
@@ -38,7 +42,7 @@ cms <- coef(fm)[["Subject"]] %>%
 cms
 ```
 
-# Generate facet plot
+## Facet plot
 
 ```{r}
 plot1 <- 
@@ -51,8 +55,9 @@ plot1 <-
   theme_bw()
 plot1
 ```
+## Demonstration of borrowing strength
 
-# Estimate within-subject slopes
+### Estimates of within-subject slopes
 
 ```{r}
 wss <- lmList(Reaction ~ 1 + Days | Subject, sleepstudy) %>% 
@@ -62,7 +67,7 @@ wss <- lmList(Reaction ~ 1 + Days | Subject, sleepstudy) %>%
   tibble::add_column(Estimate = "Within-subject")
 ```
 
-# Estimate for pooled data
+### Estimate for pooled data
 
 ```{r}
 pld <- tibble(
@@ -73,17 +78,17 @@ pld <- tibble(
 )
 ```
 
-# Combine the estimates
+### Combine the estimates
 
 ```{r}
 cms_wss_pld <- bind_rows(cms, wss, pld)
 cms_wss_pld
 ```
 
-# Generate second facet plot
+### Combined facet plot
 
 ```{r}
-plot2 <- 
+plot2 <-
   sleepstudy %>%
   ggplot(aes(x = Days, y = Reaction)) + 
   geom_point() +
@@ -99,7 +104,7 @@ ggsave("plot2.svg", plot2, width = 8, height = 7)
 plot2
 ```
 
-# Shrinkage plot
+### Shrinkage plot
 
 ```{r}
 bind_rows(wss, cms) %>%
@@ -112,7 +117,7 @@ bind_rows(wss, cms) %>%
   ggtitle("Shrinkage ('Borrowing Strength')")
 ```
 
-# Appendix
+## Appendix
 
 ```{r}
 sessionInfo()
