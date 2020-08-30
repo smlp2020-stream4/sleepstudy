@@ -1,0 +1,102 @@
+
+# Caterpillars in Julia-based MixedModels
+
+## Setup
+
+We produce the subject facets for the `sleepstudy` data including
+
++ observations
++ conditional means
++ within-subject slopes
++ estimate for pooled data
+
+```{julia;term=true}
+#cd("/Users/reinholdkliegl/Google Drive/git_projects/sleepstudy")
+using Pkg; Pkg.activate(".")      
+using MixedModels, JellyMe4, RCall
+using DataFrames, DataFramesMeta, CSV   
+using Distributions: mean 
+
+```
+
+## Fit the model
+
+```{julia;term=true}
+# retrieve the data
+sleepstudy = MixedModels.dataset(:sleepstudy)
+sleepstudy.days = convert(Array{Float64}, sleepstudy.days);
+
+# reorder levels of Subject by mean of Reaction
+subj_order = sort(combine(groupby(sleepstudy, :subj), :reaction => mean), :reaction_mean);
+sleepstudy = @linq sleepstudy |> transform(subj = levels!(categorical(:subj), subj_order.subj));
+sort!(sleepstudy, :subj);
+
+# fit the model
+m = fit(
+    MixedModel,
+    @formula(reaction ~ 1+days+(1 + days |subj)), 
+    sleepstudy,
+)
+```
+
+## Ship it to R for postprocessing
+
+```julia
+m2r = Tuple([m, sleepstudy]);
+@rput m2r;
+```
+
+## Caterpillars
+
+```julia
+RCall.ijulia_setdevice(MIME("image/svg+xml"), width=6, height=3.5);  # set the svg device
+
+R"""
+require("tidyverse", quietly=TRUE);
+source("ggCaterpillar.R")
+
+cms  <- ranef(m2r, condVar=TRUE)
+"""
+
+R"ggCaterpillar(cms, QQ=TRUE, likeDotplot=FALSE)"
+R"ggCaterpillar(cms, QQ=FALSE, likeDotplot=TRUE)"
+```
+
+## Appendix
+
+### Output options
+
+This script can be used to generate alternative source or output files in the REPL.
+
+**Alternative source files**
+
+```
+julia> using Weave
+julia> convert_doc("*.jmd", "*.ipynb")  # input for Jupyter notebook
+julia> convert_doc("*.jmd", "*.jl")     # Julia script w/o markdown
+```
+
+**Alternative output files**
+
+The script can be executed and the output written with different formats. The first command lists all options. The second command generates an HTML file; this file can be used to generate a PDF from the browser (e.g., Safari: File > Export as PDF). The other options may need additional *kwargs* to yield the intended product. 
+
+```
+julia> list_out_formats()
+julia> weave("*.jmd", fig_path="figures", fig_ext=".svg", doctype="pandoc2html", pandoc_options=["--toc", "-N"]) # HTML file
+```
+
+## Extracting stuff from the model object
+
++ julia> methods(GeneralizedLinearMixedModel)  # shows 6 methods for type constructor
++ julia> '?GeneralizedLinearMixedModel'        # shows Fields and Properties
++ julia> getfield(m2_ext,1)                    # 1:10 Fields, one of them is LMM
++ julia> propertynames(m2_ext)                 # extract with "." extractor
++ julia> getfield(getfield(m2_ext, 1), 2)      #  formula, trms, A, L, and optsum
++ julia> temp = getfield(getfield(m2_ext, 1), 2)[2]  # getfield of LMM field of GLMM field LMM
+
+### Session information
+
+```{julia;term=true}
+using InteractiveUtils
+versioninfo()
+```
