@@ -49,16 +49,11 @@ m = fit(
 ### Extract conditional means
 
 ```{julia;term=true}
-#propertynames(m)
-unit_id = getfield.(m.allterms,3)[1];
-
-  cms = DataFrame(ranef(m; uscale=false, named=true)[:1]) .+  m.β;
-  rename!(cms, unit_id, makeunique = true); 
-  cms = DataFrame([[names(cms)]; collect.(eachrow(cms))], [:column; Symbol.(axes(cms, 1))]);
-  #rename!(cms_df, pushfirst!(fixefnames(m), "Subj"), makeunique = true)
-  rename!(cms, ["subj", "day_0", "days"]);
-  cms.estimate = "Conditional mean";
-  cms
+cms = only(ranef(m)) .+  m.β;
+cms = DataFrame((subj = first(m.allterms).levels, Intercept = cms[1,:], days = cms[2,:]))
+rename!(cms, ["subj", "day_0", "days"]);
+cms.estimate = "Conditional mean";
+cms
  # CSV.write("cms.csv", cms);
 
  @rput sleepstudy 
@@ -88,6 +83,8 @@ plot1
 
 ```{julia;term=true}
 linreg1(x::AbstractVector{T}, y::AbstractVector{T}) where {T<:AbstractFloat} = [ones(length(x)) x]\y
+
+unit_id = first(m.allterms).levels;
 
 wss = DataFrame(subj=unit_id, day_0 =.0, days =.0, estimate = "Within-subject");
 
